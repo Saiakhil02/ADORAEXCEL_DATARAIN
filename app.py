@@ -469,27 +469,24 @@ with st.sidebar:
             st.markdown("---")
 
     # Comparison selection
-    st.subheader("🔍 Compare Excel Files")
-    excel_files = [doc_name for doc_name, doc in st.session_state['documents'].items()
-                   if doc['type'] in ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                                      'application/vnd.ms-excel']]
-    if len(excel_files) >= 2:
+    st.subheader("🔍 Compare Documents")
+    all_files = list(st.session_state['documents'].keys())
+    if len(all_files) >= 2:
         selected_comparison = st.multiselect(
-            "Select exactly 2 Excel files to compare",
-            options=excel_files,
+            "Select exactly 2 documents to compare (any type)",
+            options=all_files,
             max_selections=2,
             default=None,
             key="compare_files"
         )
-        if len(selected_comparison) == 2:
+        if selected_comparison and len(selected_comparison) == 2:
             st.session_state['comparison_documents'] = selected_comparison
-            logger.info(f"Comparison documents set: {selected_comparison}")
         else:
             st.session_state['comparison_documents'] = []
-            st.warning("Please select exactly 2 Excel files for comparison.")
+            st.info("Select two documents for comparison.")
     else:
         st.session_state['comparison_documents'] = []
-        st.info("Upload at least two Excel files to enable comparison.")
+        st.info("Upload at least two documents to enable comparison.")
 
     # Settings
     st.subheader("⚙️ Settings")
@@ -513,9 +510,9 @@ if st.session_state['current_document']:
     # Update header to reflect comparison if applicable
     if st.session_state['comparison_documents'] and len(st.session_state['comparison_documents']) == 2:
         file1, file2 = st.session_state['comparison_documents']
-        st.header(f"💬 Chat with {file1} and {file2}")
+        st.header(f"💬 Chat with your files")
     else:
-        st.header(f"💬 Chat with {st.session_state['current_document']}")
+        st.header(f"💬 Chat with your file")
 
     current_chat = get_current_chat_session()
 
@@ -533,7 +530,7 @@ if st.session_state['current_document']:
                 else:
                     st.json(vis_data)
 
-    if prompt := st.chat_input(f"Ask about {st.session_state['current_document']}..."):
+    if prompt := st.chat_input(f"ask anything"):
         st.session_state['last_query'] = prompt  # Store last query
         current_chat.append({"role": "user", "content": prompt, "visualization": None})
         db = next(get_db())
@@ -626,7 +623,10 @@ if st.session_state['current_document']:
                                         else:
                                             # Generate comparative visualization
                                             if is_graph_query:
-                                                if 'pie' in prompt.lower() or 'piechart' in prompt.lower():
+                                                from visualization_utils import VisualizationGenerator
+                                                chart_type = VisualizationGenerator.detect_visualization_type(prompt) or 'bar'  # Default to bar
+                                                logger.info(f"Detected chart type: {chart_type}")
+                                                if chart_type == 'pie':
                                                     # Aggregate Expenses by Region for each file
                                                     agg_df1 = df1.groupby('Region')['Expenses'].sum().reset_index()
                                                     agg_df2 = df2.groupby('Region')['Expenses'].sum().reset_index()
@@ -667,7 +667,7 @@ if st.session_state['current_document']:
                                                     else:
                                                         response = "Failed to generate graph due to API error."
                                                         logger.error("Plotly code generation failed.")
-                                                elif 'heatmap' in prompt.lower():
+                                                elif chart_type == 'heatmap':
                                                     # Pivot data for heatmap
                                                     pivot_df1 = df1.pivot_table(values='Revenue', index='Category', columns='Region', aggfunc='sum', fill_value=0)
                                                     pivot_df2 = df2.pivot_table(values='Revenue', index='Category', columns='Region', aggfunc='sum', fill_value=0)
@@ -763,33 +763,23 @@ if st.session_state['current_document']:
                                                             if max_rows == 0:
                                                                 response = f"No valid data available for {x_col} and {y_col} after cleaning."
                                                             else:
+                                                                MAX_ROWS_FOR_PROMPT = 30
+                                                                nrows = min(max_rows, MAX_ROWS_FOR_PROMPT)
                                                                 comparison_data['dataset1']['data'] = {
-                                                                    'x': [str(df1_clean[x_col].iloc[i]) for i in range(max_rows)],
-                                                                    'y': [float(df1_clean[y_col].iloc[i]) if df1_clean[y_col].dtype in ['int64', 'float64'] else None for i in range(max_rows)]
+                                                                    'x': [str(df1_clean[x_col].iloc[i]) for i in range(nrows)],
+                                                                    'y': [float(df1_clean[y_col].iloc[i]) if df1_clean[y_col].dtype in ['int64', 'float64'] else None for i in range(nrows)]
                                                                 }
                                                                 comparison_data['dataset2']['data'] = {
-                                                                    'x': [str(df2_clean[x_col].iloc[i]) for i in range(max_rows)],
-                                                                    'y': [float(df2_clean[y_col].iloc[i]) if df2_clean[y_col].dtype in ['int64', 'float64'] else None for i in range(max_rows)]
+                                                                    'x': [str(df2_clean[x_col].iloc[i]) for i in range(nrows)],
+                                                                    'y': [float(df2_clean[y_col].iloc[i]) if df2_clean[y_col].dtype in ['int64', 'float64'] else None for i in range(nrows)]
                                                                 }
                                                         logger.info(f"Comparison data for chart: {comparison_data}")
-                                                        # Debug: Display Plotly code
                                                         plotly_code = get_plotly_code_from_input(None, prompt, comparison_data=comparison_data)
                                                         if plotly_code:
-                                                  #          st.write("Generated Plotly Code:", plotly_code)  # Debug output
                                                             try:
                                                                 local_vars = {}
                                                                 exec(plotly_code, {'pd': pd, 'go': go, 'sp': sp}, local_vars)
-                                                                if 'fig' in local_vars:
-                                                                    visualization = {
-                                                                        'type': 'plotly',
-                                                                        'data': convert_numpy_to_list(local_vars['fig'].to_dict())
-                                                                    }
-                                                                    response = f"Generated a comparative bar chart for {y_col} by {x_col} between {file1} and {file2}."
-                                                                else:
-                                                                    response = "No figure generated in Plotly code."
-                                                                    logger.error("Plotly code did not produce a figure.")
                                                             except Exception as e:
-                                                                response = f"Failed to generate comparative graph: {str(e)}"
                                                                 logger.error(f"Plotly execution error: {str(e)}")
                                                         else:
                                                             response = "Failed to generate graph due to API error."
