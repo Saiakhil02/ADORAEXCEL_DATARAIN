@@ -1,0 +1,45 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Environment variables and secrets
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VSCode and PyCharm settings (optional, if you use these editors)
+.vscode/
+.idea/
+
+# Streamlit cache and logs
+.streamlit/
+logs/
+
+# Data files and outputs (customize as needed)
+*.sqlite3
+*.db
+*.log
+*.bak
+
+# Distribution/build
+build/
+dist/
+*.egg-info/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp

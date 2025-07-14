@@ -5,12 +5,12 @@ import plotly.express as px
 from typing import Dict, Any, Optional, List, Tuple
 import logging
 
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 class VisualizationGenerator:
     """Handles generation of visualizations from data and natural language requests."""
     
-    def _init_(self):
+    def __init__(self):
         self.supported_charts = {
             'bar': self._create_bar_chart,
             'line': self._create_line_chart,

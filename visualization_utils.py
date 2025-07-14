@@ -5,7 +5,7 @@ from typing import Dict, Any, List, Optional, Union
 import re
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(_name_)
 
 class VisualizationGenerator:
     """
@@ -42,31 +42,30 @@ class VisualizationGenerator:
         return None
     
     @staticmethod
-    def extract_columns(query: str, df_columns: List[str]) -> Dict[str, Any]:
+    def extract_columns(query: str, df: pd.DataFrame) -> Dict[str, Any]:
         """
         Extract column names from the query that match the DataFrame columns.
         
         Args:
             query: User's query string
-            df_columns: List of column names in the DataFrame
-            
+            df: The DataFrame
         Returns:
             Dict containing x, y, color, and other relevant parameters
         """
         result = {'x': None, 'y': None, 'color': None, 'agg': None}
         query_lower = query.lower()
-        
+        df_columns = df.columns.tolist()
+
         # Check for aggregation functions
         agg_functions = ['sum', 'average', 'mean', 'count', 'max', 'min', 'median']
         for func in agg_functions:
             if func in query_lower:
                 result['agg'] = func
                 break
-        
+
         # Match column names from the query
         for col in df_columns:
             col_lower = col.lower()
-            
             # Check for x-axis
             if col_lower in query_lower and not result.get('x'):
                 result['x'] = col
@@ -76,13 +75,41 @@ class VisualizationGenerator:
             # Check for color/hue
             if f"color by {col_lower}" in query_lower or f"group by {col_lower}" in query_lower:
                 result['color'] = col
-        
-        # If y is not found but x is, assume y is the first numeric column
-        if result.get('x') and not result.get('y'):
-            numeric_cols = [col for col in df_columns if pd.api.types.is_numeric_dtype(df_columns[col])]
-            if numeric_cols:
-                result['y'] = numeric_cols[0]
-        
+
+        # Enhanced fallback: infer numeric columns by checking actual values, not just dtype
+        import pandas as pd
+        inferred_numeric_cols = []
+        for col in df.columns:
+            # If already numeric, accept
+            if pd.api.types.is_numeric_dtype(df[col]):
+                inferred_numeric_cols.append(col)
+            # If object, try to convert
+            elif df[col].dtype == 'object':
+                converted = pd.to_numeric(df[col], errors='coerce')
+                # If more than 80% of non-null values convert, treat as numeric
+                non_null = df[col].notnull().sum()
+                numeric_count = converted.notnull().sum()
+                if non_null > 0 and numeric_count / non_null > 0.8:
+                    inferred_numeric_cols.append(col)
+        # Use inferred numeric columns for fallback
+        if (not result.get('x') or not result.get('y')) and inferred_numeric_cols:
+            if not result.get('x') and len(inferred_numeric_cols) > 0:
+                result['x'] = inferred_numeric_cols[0]
+            if not result.get('y') and len(inferred_numeric_cols) > 1:
+                result['y'] = inferred_numeric_cols[1]
+            elif not result.get('y') and len(inferred_numeric_cols) == 1:
+                result['y'] = inferred_numeric_cols[0]
+        # If still missing, fallback to first two columns
+        if (not result.get('x') or not result.get('y')) and len(df_columns) >= 2:
+            if not result.get('x'):
+                result['x'] = df_columns[0]
+            if not result.get('y'):
+                result['y'] = df_columns[1]
+        elif (not result.get('x') or not result.get('y')) and len(df_columns) == 1:
+            if not result.get('x'):
+                result['x'] = df_columns[0]
+            if not result.get('y'):
+                result['y'] = df_columns[0]
         return result
     
     def create_visualization(self, df: pd.DataFrame, query: str) -> go.Figure:
@@ -99,9 +126,9 @@ class VisualizationGenerator:
         viz_type = self.detect_visualization_type(query)
         if not viz_type:
             viz_type = 'bar'  # Default to bar chart
-            
-        params = self.extract_columns(query, df.columns.tolist())
-        
+
+        params = self.extract_columns(query, df)
+
         try:
             if viz_type == 'bar':
                 return self._create_bar_chart(df, **params)
