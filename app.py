@@ -21,6 +21,7 @@ from file_processor import FileProcessor
 from vector_store import vector_store_manager
 from chatbot import Chatbot
 import logging
+from visualization_utils import VisualizationGenerator
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -934,7 +935,15 @@ if st.session_state['current_document']:
                                                         'type': 'plotly',
                                                         'data': convert_numpy_to_list(local_vars['fig'].to_dict())
                                                     }
-                                                    response = f"Generated a bar chart for {y_col} by {x_col} in {st.session_state['current_document']}."
+                                                    chart_type = VisualizationGenerator.detect_visualization_type(prompt) or 'bar'
+                                                    logger.info(f"Prompt: {prompt} | Detected chart type: {chart_type}")
+                                                    chart_type_name = chart_type.capitalize()
+                                                    if chart_type == 'scatter':
+                                                        response = f"Generated a Scatter plot for {y_col} by {x_col} in {st.session_state['current_document']}."
+                                                    elif chart_type == 'bar':
+                                                        response = f"Generated a Bar chart for {y_col} by {x_col} in {st.session_state['current_document']}."
+                                                    else:
+                                                        response = f"Generated a {chart_type_name} chart for {y_col} by {x_col} in {st.session_state['current_document']}."
                                                 else:
                                                     response = "No figure generated in Plotly code."
                                                     logger.error("Plotly code did not produce a figure.")

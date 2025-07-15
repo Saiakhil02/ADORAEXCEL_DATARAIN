@@ -5,7 +5,7 @@ from typing import Dict, Any, List, Optional, Union
 import re
 import logging
 
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 class VisualizationGenerator:
     """
@@ -16,29 +16,25 @@ class VisualizationGenerator:
     def detect_visualization_type(query: str) -> Optional[str]:
         """
         Detect the type of visualization requested in the user's query.
-        
-        Args:
-            query: User's query string
-            
-        Returns:
-            str: Type of visualization (bar, line, scatter, etc.) or None if not detected
+        Uses regex for whole word matching and prioritizes specific chart types.
         """
+        import re
         query = query.lower()
-        
-        visualization_map = {
-            'bar': ['bar', 'column', 'barchart', 'bar chart', 'bar graph'],
-            'line': ['line', 'trend', 'time series', 'line chart'],
-            'scatter': ['scatter', 'scatterplot', 'scatter plot', 'correlation'],
-            'pie': ['pie', 'donut', 'pie chart', 'donut chart'],
-            'histogram': ['histogram', 'distribution', 'frequency'],
-            'box': ['box', 'boxplot', 'box plot', 'whisker'],
-            'heatmap': ['heatmap', 'heat map', 'correlation matrix', 'correlation heatmap']
-        }
-        
-        for viz_type, keywords in visualization_map.items():
-            if any(keyword in query for keyword in keywords):
-                return viz_type
-                
+        # Prioritize more specific chart types first
+        visualization_map = [
+            ('scatter', ['scatter', 'scatterplot', 'scatter plot', 'correlation']),
+            ('line', ['line', 'trend', 'time series', 'line chart']),
+            ('bar', ['bar', 'column', 'barchart', 'bar chart', 'bar graph']),
+            ('pie', ['pie', 'donut', 'pie chart', 'donut chart']),
+            ('histogram', ['histogram', 'distribution', 'frequency']),
+            ('box', ['box', 'boxplot', 'box plot', 'whisker']),
+            ('heatmap', ['heatmap', 'heat map', 'correlation matrix', 'correlation heatmap'])
+        ]
+        for viz_type, keywords in visualization_map:
+            for keyword in keywords:
+                # Use regex to match whole words or phrases
+                if re.search(r'\b' + re.escape(keyword) + r'\b', query):
+                    return viz_type
         return None
     
     @staticmethod
