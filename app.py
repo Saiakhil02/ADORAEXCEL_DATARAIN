@@ -22,6 +22,7 @@ from vector_store import vector_store_manager
 from chatbot import Chatbot
 import logging
 from visualization_utils import VisualizationGenerator
+import sunshower
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -508,6 +509,15 @@ with st.sidebar:
 
 # Chat interface
 if st.session_state['current_document']:
+    doc_dict = st.session_state['documents'][st.session_state['current_document']]
+    df = doc_dict.get('dataframe')
+    if df is not None:
+        if st.button('🌦️ Give me a Sunshower'):
+            with st.spinner('Looking for surprising relationships...'):
+                insights = sunshower.find_sunshower_patterns(df)
+            st.subheader('🌦️ Sunshower Insights')
+            for insight in insights:
+                st.write(f'- {insight}')
     # Update header to reflect comparison if applicable
     if st.session_state['comparison_documents'] and len(st.session_state['comparison_documents']) == 2:
         file1, file2 = st.session_state['comparison_documents']
