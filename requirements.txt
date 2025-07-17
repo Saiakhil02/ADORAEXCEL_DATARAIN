@@ -34,3 +34,4 @@ plotly>=5.18.0
 # Authentication (optional)
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+Scikit-learn
